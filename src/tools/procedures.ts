@@ -51,7 +51,6 @@ export async function listProcedures(
   const systemFilter = includeSystemObjects ? '' : 'AND o.is_ms_shipped = 0';
 
   const query = `
-    USE [${database}];
     SELECT
         SCHEMA_NAME(o.schema_id)  AS [schema],
         o.name                    AS procedureName,
@@ -66,7 +65,7 @@ export async function listProcedures(
     ORDER BY SCHEMA_NAME(o.schema_id), o.name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     schema: String(r['schema'] ?? ''),
     procedureName: String(r['procedureName'] ?? ''),
@@ -88,13 +87,12 @@ export async function getProcedureDefinition(
   const objectId = `'${schema.replace(/'/g, "''")}.${procedureName.replace(/'/g, "''")}'`;
 
   const definitionQuery = `
-    USE [${database}];
     SELECT
         SCHEMA_NAME(o.schema_id)  AS [schema],
         o.name                    AS objectName,
         o.type_desc               AS objectType,
         sm.definition             AS definition,
-        sm.is_encrypted           AS isEncrypted,
+        CAST(0 AS BIT)            AS isEncrypted,
         o.create_date             AS createDate,
         o.modify_date             AS modifyDate
     FROM sys.objects o
@@ -103,7 +101,6 @@ export async function getProcedureDefinition(
   `;
 
   const paramsQuery = `
-    USE [${database}];
     SELECT
         p.name                      AS name,
         tp.name                     AS dataType,
@@ -121,8 +118,8 @@ export async function getProcedureDefinition(
   `;
 
   const [defResult, paramsResult] = await Promise.all([
-    executeQuery(definitionQuery),
-    executeQuery(paramsQuery),
+    executeQuery(definitionQuery, database),
+    executeQuery(paramsQuery, database),
   ]);
 
   const def = defResult.rows[0];
@@ -163,7 +160,6 @@ export async function getProcedureDependencies(
   procedureName: string
 ): Promise<ProcedureDependency[]> {
   const query = `
-    USE [${database}];
     SELECT DISTINCT
         COALESCE(re.referenced_schema_name, '')  AS referencedSchema,
         re.referenced_entity_name                AS referencedObject,
@@ -176,7 +172,7 @@ export async function getProcedureDependencies(
     ORDER BY re.referenced_class_desc, re.referenced_entity_name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     referencedSchema: r['referencedSchema'] ? String(r['referencedSchema']) : null,
     referencedObject: String(r['referencedObject'] ?? ''),
@@ -195,7 +191,6 @@ export async function getReverseDependencies(
   objectName: string
 ): Promise<{ callerSchema: string; callerName: string; callerType: string }[]> {
   const query = `
-    USE [${database}];
     SELECT DISTINCT
         SCHEMA_NAME(o.schema_id)    AS callerSchema,
         o.name                      AS callerName,
@@ -206,7 +201,7 @@ export async function getReverseDependencies(
     ORDER BY o.name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     callerSchema: String(r['callerSchema'] ?? ''),
     callerName: String(r['callerName'] ?? ''),

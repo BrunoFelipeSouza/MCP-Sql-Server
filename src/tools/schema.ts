@@ -57,7 +57,6 @@ export async function listTables(
   const schemaFilter = schema ? `AND t.TABLE_SCHEMA = '${schema.replace(/'/g, "''")}'` : '';
 
   const query = `
-    USE [${database}];
     SELECT
         t.TABLE_SCHEMA       AS [schema],
         t.TABLE_NAME         AS tableName,
@@ -72,7 +71,7 @@ export async function listTables(
     ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     schema: String(r['schema'] ?? ''),
     tableName: String(r['tableName'] ?? ''),
@@ -93,7 +92,6 @@ export async function getTableSchema(
   tableName: string
 ): Promise<TableColumn[]> {
   const query = `
-    USE [${database}];
     SELECT
         c.COLUMN_NAME                               AS columnName,
         c.DATA_TYPE                                 AS dataType,
@@ -144,7 +142,7 @@ export async function getTableSchema(
     ORDER BY c.ORDINAL_POSITION;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     columnName: String(r['columnName'] ?? ''),
     dataType: String(r['dataType'] ?? ''),
@@ -171,7 +169,6 @@ export async function getIndexes(
   tableName: string
 ): Promise<IndexInfo[]> {
   const query = `
-    USE [${database}];
     SELECT
         i.name                          AS indexName,
         i.type_desc                     AS indexType,
@@ -197,7 +194,7 @@ export async function getIndexes(
     ORDER BY i.is_primary_key DESC, i.name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     indexName: String(r['indexName'] ?? ''),
     indexType: String(r['indexType'] ?? ''),
@@ -218,7 +215,6 @@ export async function getForeignKeys(
   tableName: string
 ): Promise<ForeignKeyInfo[]> {
   const query = `
-    USE [${database}];
     SELECT
         fk.name                             AS constraintName,
         c.name                              AS columnName,
@@ -242,7 +238,7 @@ export async function getForeignKeys(
     ORDER BY fk.name, fkc.constraint_column_id;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     constraintName: String(r['constraintName'] ?? ''),
     columnName: String(r['columnName'] ?? ''),
@@ -263,7 +259,6 @@ export async function listViews(
 ): Promise<{ schema: string; viewName: string; definition: string }[]> {
   const schemaFilter = schema ? `AND SCHEMA_NAME(v.schema_id) = '${schema.replace(/'/g, "''")}'` : '';
   const query = `
-    USE [${database}];
     SELECT
         SCHEMA_NAME(v.schema_id) AS [schema],
         v.name                   AS viewName,
@@ -273,7 +268,7 @@ export async function listViews(
     WHERE 1=1 ${schemaFilter}
     ORDER BY SCHEMA_NAME(v.schema_id), v.name;
   `;
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     schema: String(r['schema'] ?? ''),
     viewName: String(r['viewName'] ?? ''),
@@ -293,7 +288,6 @@ export async function listTriggers(
   const tableFilter = tableName ? `AND t.name = '${tableName.replace(/'/g, "''")}'` : '';
 
   const query = `
-    USE [${database}];
     SELECT
         SCHEMA_NAME(t.schema_id) AS [schema],
         t.name                   AS tableName,
@@ -310,7 +304,7 @@ export async function listTriggers(
     ORDER BY t.name, tr.name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     schema: String(r['schema'] ?? ''),
     tableName: String(r['tableName'] ?? ''),

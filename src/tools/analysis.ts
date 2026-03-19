@@ -121,7 +121,6 @@ export async function getCheckConstraints(
   const tableFilter = tableName ? `AND t.name = '${tableName.replace(/'/g, "''")}'` : '';
 
   const query = `
-    USE [${database}];
     SELECT
         SCHEMA_NAME(t.schema_id)    AS [schema],
         t.name                      AS tableName,
@@ -140,7 +139,7 @@ export async function getCheckConstraints(
     ORDER BY t.name, cc.name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     schema: String(r['schema'] ?? ''),
     tableName: String(r['tableName'] ?? ''),
@@ -163,7 +162,6 @@ export async function getExtendedProperties(
   const objectFilter = objectName ? `AND o.name = '${objectName.replace(/'/g, "''")}'` : '';
 
   const query = `
-    USE [${database}];
     SELECT
         o.type_desc         AS objectType,
         SCHEMA_NAME(o.schema_id) AS [schema],
@@ -179,7 +177,7 @@ export async function getExtendedProperties(
     ORDER BY o.name, ep.name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     objectType: String(r['objectType'] ?? ''),
     schema: String(r['schema'] ?? ''),
@@ -197,25 +195,38 @@ export async function searchInProcedures(
   database: string,
   searchTerm: string
 ): Promise<{ schema: string; objectName: string; objectType: string; matchCount: number }[]> {
+  if (!searchTerm || searchTerm.trim().length === 0) {
+    throw new Error('Search term cannot be empty.');
+  }
+  if (searchTerm.length > 200) {
+    throw new Error('Search term exceeds maximum length of 200 characters.');
+  }
+
+  // Escape single quotes for SQL string literals.
   const escaped = searchTerm.replace(/'/g, "''");
+  // Escape LIKE wildcard characters (%, _, [) so the term is a literal pattern.
+  const likeEscaped = escaped
+    .replace(/!/g, '!!')
+    .replace(/%/g, '!%')
+    .replace(/_/g, '!_')
+    .replace(/\[/g, '![');
 
   const query = `
-    USE [${database}];
     SELECT
         SCHEMA_NAME(o.schema_id)    AS [schema],
         o.name                      AS objectName,
         o.type_desc                 AS objectType,
         (
             LEN(sm.definition) - LEN(REPLACE(UPPER(sm.definition), UPPER('${escaped}'), ''))
-        ) / LEN('${escaped}')       AS matchCount
+        ) / NULLIF(LEN('${escaped}'), 0) AS matchCount
     FROM sys.sql_modules sm
     INNER JOIN sys.objects o ON o.object_id = sm.object_id
-    WHERE sm.definition LIKE '%${escaped}%'
+    WHERE sm.definition LIKE '%${likeEscaped}%' ESCAPE '!'
       AND o.is_ms_shipped = 0
     ORDER BY matchCount DESC, o.name;
   `;
 
-  const result = await executeQuery(query);
+  const result = await executeQuery(query, database);
   return result.rows.map((r) => ({
     schema: String(r['schema'] ?? ''),
     objectName: String(r['objectName'] ?? ''),
