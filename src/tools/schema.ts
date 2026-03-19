@@ -168,29 +168,41 @@ export async function getIndexes(
   schema: string,
   tableName: string
 ): Promise<IndexInfo[]> {
+  const safeSchema = schema.replace(/'/g, "''");
+  const safeTable = tableName.replace(/'/g, "''");
+
   const query = `
     SELECT
         i.name                          AS indexName,
         i.type_desc                     AS indexType,
         i.is_unique                     AS isUnique,
         i.is_primary_key                AS isPrimaryKey,
-        STRING_AGG(
-            CASE WHEN ic.is_included_column = 0 THEN c.name END,
-            ', '
-        ) WITHIN GROUP (ORDER BY ic.key_ordinal) AS indexColumns,
-        STRING_AGG(
-            CASE WHEN ic.is_included_column = 1 THEN c.name END,
-            ', '
-        )                               AS includedColumns,
+        STUFF(
+            (SELECT ', ' + c.name
+             FROM sys.index_columns ic
+             INNER JOIN sys.columns c
+                 ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+             WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
+               AND ic.is_included_column = 0
+             ORDER BY ic.key_ordinal
+             FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'),
+            1, 2, ''
+        ) AS indexColumns,
+        STUFF(
+            (SELECT ', ' + c.name
+             FROM sys.index_columns ic
+             INNER JOIN sys.columns c
+                 ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+             WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
+               AND ic.is_included_column = 1
+             ORDER BY ic.column_id
+             FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'),
+            1, 2, ''
+        ) AS includedColumns,
         i.filter_definition             AS filterDefinition
     FROM sys.indexes i
-    INNER JOIN sys.index_columns ic
-        ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-    INNER JOIN sys.columns c
-        ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-    WHERE i.object_id = OBJECT_ID('${schema.replace(/'/g, "''")}.${tableName.replace(/'/g, "''")}')
+    WHERE i.object_id = OBJECT_ID('${safeSchema}.${safeTable}')
       AND i.name IS NOT NULL
-    GROUP BY i.name, i.type_desc, i.is_unique, i.is_primary_key, i.filter_definition
     ORDER BY i.is_primary_key DESC, i.name;
   `;
 
