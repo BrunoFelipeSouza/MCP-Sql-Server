@@ -1,0 +1,44 @@
+{
+  "name": "mcp-sql-server",
+  "version": "1.0.0",
+  "description": "MCP Server dedicado ao SQL Server - Extração de metadados, procedures, regras de negócio e documentação automática",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "tsc --watch",
+    "lint": "eslint src/**/*.ts",
+    "test": "jest"
+  },
+  "keywords": [
+    "mcp",
+    "sql-server",
+    "model-context-protocol",
+    "database",
+    "reverse-engineering"
+  ],
+  "author": "BrunoFelipeSouza",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "dotenv": "^16.4.5",
+    "mssql": "^11.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/mssql": "^9.1.5",
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
