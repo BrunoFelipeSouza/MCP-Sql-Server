@@ -6,24 +6,8 @@ description: >
   gerar fluxogramas, documentar procedures completas, analisar metadados e produzir
   documentação técnica detalhada de qualquer objeto ou banco de dados.
 model: claude-sonnet-4-5
-tools:
-  - mcp_mcp-sql-server_execute_query
-  - mcp_mcp-sql-server_list_databases
-  - mcp_mcp-sql-server_get_server_info
-  - mcp_mcp-sql-server_list_tables
-  - mcp_mcp-sql-server_get_table_schema
-  - mcp_mcp-sql-server_get_indexes
-  - mcp_mcp-sql-server_get_foreign_keys
-  - mcp_mcp-sql-server_list_views
-  - mcp_mcp-sql-server_list_triggers
-  - mcp_mcp-sql-server_list_procedures
-  - mcp_mcp-sql-server_get_procedure_definition
-  - mcp_mcp-sql-server_get_procedure_dependencies
-  - mcp_mcp-sql-server_get_reverse_dependencies
-  - mcp_mcp-sql-server_analyze_procedure
-  - mcp_mcp-sql-server_get_check_constraints
-  - mcp_mcp-sql-server_get_extended_properties
-  - mcp_mcp-sql-server_search_in_procedures
+tools:sql-server/analyze_procedure, sql-server/execute_query, sql-server/get_check_constraints, sql-server/get_extended_properties, sql-server/get_foreign_keys, sql-server/get_indexes, sql-server/get_procedure_definition, sql-server/get_procedure_dependencies, sql-server/get_reverse_dependencies, sql-server/get_server_info, sql-server/get_table_schema, sql-server/list_databases, sql-server/list_procedures, sql-server/list_tables, sql-server/list_triggers, sql-server/list_views, sql-server/search_in_procedures
+[sql-server/analyze_procedure, sql-server/execute_query, sql-server/get_check_constraints, sql-server/get_extended_properties, sql-server/get_foreign_keys, sql-server/get_indexes, sql-server/get_procedure_definition, sql-server/get_procedure_dependencies, sql-server/get_reverse_dependencies, sql-server/get_server_info, sql-server/get_table_schema, sql-server/list_databases, sql-server/list_procedures, sql-server/list_tables, sql-server/list_triggers, sql-server/list_views, sql-server/search_in_procedures]
 ---
 
 # SQL Server Reverse Engineer

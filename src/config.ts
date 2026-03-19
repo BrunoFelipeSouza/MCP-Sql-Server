@@ -1,7 +1,8 @@
 import * as sql from 'mssql';
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 export interface SqlServerConfig {
   server: string;

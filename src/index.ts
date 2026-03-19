@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 
 import { closeConnection } from './config.js';
-import { executeQuery, listDatabases, getServerInfo } from './tools/query.js';
+import { executeQuery, assertReadOnlyQuery, validateIdentifier, listDatabases, getServerInfo } from './tools/query.js';
 import {
   listTables,
   getTableSchema,
@@ -267,6 +267,23 @@ const TOOLS = [
 ] as const;
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Parameter validation helpers (throw McpError InvalidParams on bad input)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function requireParam(val: unknown, fieldName: string): string {
+  try {
+    return validateIdentifier(String(val ?? ''), fieldName);
+  } catch (e) {
+    throw new McpError(ErrorCode.InvalidParams, e instanceof Error ? e.message : String(e));
+  }
+}
+
+function optionalParam(val: unknown, fieldName: string): string | undefined {
+  if (val == null || String(val).trim() === '') return undefined;
+  return requireParam(val, fieldName);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Server bootstrap
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -293,11 +310,15 @@ async function main(): Promise<void> {
     try {
       switch (name) {
         case 'execute_query': {
-          const query = String(a['query'] ?? '');
-          if (!/^\s*SELECT\b/i.test(query)) {
-            throw new McpError(ErrorCode.InvalidParams, 'Only SELECT statements are allowed.');
+          const query = String(a['query'] ?? '').trim();
+          if (!query) throw new McpError(ErrorCode.InvalidParams, "'query' must not be empty.");
+          try {
+            assertReadOnlyQuery(query);
+          } catch (e) {
+            throw new McpError(ErrorCode.InvalidParams, e instanceof Error ? e.message : String(e));
           }
-          const result = await executeQuery(query, a['database'] ? String(a['database']) : undefined);
+          const database = optionalParam(a['database'], 'database');
+          const result = await executeQuery(query, database);
           return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         }
 
@@ -312,81 +333,87 @@ async function main(): Promise<void> {
         }
 
         case 'list_tables': {
-          const tables = await listTables(String(a['database']), a['schema'] ? String(a['schema']) : undefined);
+          const database = requireParam(a['database'], 'database');
+          const schema = optionalParam(a['schema'], 'schema');
+          const tables = await listTables(database, schema);
           return { content: [{ type: 'text', text: JSON.stringify(tables, null, 2) }] };
         }
 
         case 'get_table_schema': {
-          const columns = await getTableSchema(String(a['database']), String(a['schema']), String(a['table_name']));
+          const database = requireParam(a['database'], 'database');
+          const schema = requireParam(a['schema'], 'schema');
+          const tableName = requireParam(a['table_name'], 'table_name');
+          const columns = await getTableSchema(database, schema, tableName);
           return { content: [{ type: 'text', text: JSON.stringify(columns, null, 2) }] };
         }
 
         case 'get_indexes': {
-          const indexes = await getIndexes(String(a['database']), String(a['schema']), String(a['table_name']));
+          const database = requireParam(a['database'], 'database');
+          const schema = requireParam(a['schema'], 'schema');
+          const tableName = requireParam(a['table_name'], 'table_name');
+          const indexes = await getIndexes(database, schema, tableName);
           return { content: [{ type: 'text', text: JSON.stringify(indexes, null, 2) }] };
         }
 
         case 'get_foreign_keys': {
-          const fks = await getForeignKeys(String(a['database']), String(a['schema']), String(a['table_name']));
+          const database = requireParam(a['database'], 'database');
+          const schema = requireParam(a['schema'], 'schema');
+          const tableName = requireParam(a['table_name'], 'table_name');
+          const fks = await getForeignKeys(database, schema, tableName);
           return { content: [{ type: 'text', text: JSON.stringify(fks, null, 2) }] };
         }
 
         case 'list_views': {
-          const views = await listViews(String(a['database']), a['schema'] ? String(a['schema']) : undefined);
+          const database = requireParam(a['database'], 'database');
+          const schema = optionalParam(a['schema'], 'schema');
+          const views = await listViews(database, schema);
           return { content: [{ type: 'text', text: JSON.stringify(views, null, 2) }] };
         }
 
         case 'list_triggers': {
-          const triggers = await listTriggers(
-            String(a['database']),
-            a['schema'] ? String(a['schema']) : undefined,
-            a['table_name'] ? String(a['table_name']) : undefined
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = optionalParam(a['schema'], 'schema');
+          const tableName = optionalParam(a['table_name'], 'table_name');
+          const triggers = await listTriggers(database, schema, tableName);
           return { content: [{ type: 'text', text: JSON.stringify(triggers, null, 2) }] };
         }
 
         case 'list_procedures': {
-          const procs = await listProcedures(
-            String(a['database']),
-            a['schema'] ? String(a['schema']) : undefined,
-            a['include_system_objects'] === true
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = optionalParam(a['schema'], 'schema');
+          const procs = await listProcedures(database, schema, a['include_system_objects'] === true);
           return { content: [{ type: 'text', text: JSON.stringify(procs, null, 2) }] };
         }
 
         case 'get_procedure_definition': {
-          const def = await getProcedureDefinition(
-            String(a['database']),
-            String(a['schema']),
-            String(a['procedure_name'])
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = requireParam(a['schema'], 'schema');
+          const procedureName = requireParam(a['procedure_name'], 'procedure_name');
+          const def = await getProcedureDefinition(database, schema, procedureName);
           return { content: [{ type: 'text', text: JSON.stringify(def, null, 2) }] };
         }
 
         case 'get_procedure_dependencies': {
-          const deps = await getProcedureDependencies(
-            String(a['database']),
-            String(a['schema']),
-            String(a['procedure_name'])
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = requireParam(a['schema'], 'schema');
+          const procedureName = requireParam(a['procedure_name'], 'procedure_name');
+          const deps = await getProcedureDependencies(database, schema, procedureName);
           return { content: [{ type: 'text', text: JSON.stringify(deps, null, 2) }] };
         }
 
         case 'get_reverse_dependencies': {
-          const revDeps = await getReverseDependencies(
-            String(a['database']),
-            String(a['schema']),
-            String(a['object_name'])
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = requireParam(a['schema'], 'schema');
+          const objectName = requireParam(a['object_name'], 'object_name');
+          const revDeps = await getReverseDependencies(database, schema, objectName);
           return { content: [{ type: 'text', text: JSON.stringify(revDeps, null, 2) }] };
         }
 
         case 'analyze_procedure': {
-          const def = await getProcedureDefinition(
-            String(a['database']),
-            String(a['schema']),
-            String(a['procedure_name'])
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = requireParam(a['schema'], 'schema');
+          const procedureName = requireParam(a['procedure_name'], 'procedure_name');
+          const def = await getProcedureDefinition(database, schema, procedureName);
           const metrics = analyzeProcedureDefinition(def.definition);
           return {
             content: [
@@ -399,28 +426,27 @@ async function main(): Promise<void> {
         }
 
         case 'get_check_constraints': {
-          const constraints = await getCheckConstraints(
-            String(a['database']),
-            a['schema'] ? String(a['schema']) : undefined,
-            a['table_name'] ? String(a['table_name']) : undefined
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = optionalParam(a['schema'], 'schema');
+          const tableName = optionalParam(a['table_name'], 'table_name');
+          const constraints = await getCheckConstraints(database, schema, tableName);
           return { content: [{ type: 'text', text: JSON.stringify(constraints, null, 2) }] };
         }
 
         case 'get_extended_properties': {
-          const props = await getExtendedProperties(
-            String(a['database']),
-            a['schema'] ? String(a['schema']) : undefined,
-            a['object_name'] ? String(a['object_name']) : undefined
-          );
+          const database = requireParam(a['database'], 'database');
+          const schema = optionalParam(a['schema'], 'schema');
+          const objectName = optionalParam(a['object_name'], 'object_name');
+          const props = await getExtendedProperties(database, schema, objectName);
           return { content: [{ type: 'text', text: JSON.stringify(props, null, 2) }] };
         }
 
         case 'search_in_procedures': {
-          const matches = await searchInProcedures(
-            String(a['database']),
-            String(a['search_term'])
-          );
+          const database = requireParam(a['database'], 'database');
+          const searchTerm = String(a['search_term'] ?? '').trim();
+          if (!searchTerm) throw new McpError(ErrorCode.InvalidParams, "'search_term' must not be empty.");
+          if (searchTerm.length > 200) throw new McpError(ErrorCode.InvalidParams, "'search_term' exceeds maximum length of 200 characters.");
+          const matches = await searchInProcedures(database, searchTerm);
           return { content: [{ type: 'text', text: JSON.stringify(matches, null, 2) }] };
         }
 
